@@ -1,0 +1,1038 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>混合下发规则 · 交互原型 v3</title>
+  <style>
+    :root {
+      --bg: #f3f5f8;
+      --card: #fff;
+      --text: #1f2329;
+      --muted: #8a9199;
+      --line: #e6e9ef;
+      --online: #2f6bff;
+      --drop: #12b886;
+      --warn: #f08c00;
+      --danger: #e03131;
+      --safe: #e8f3ff;
+      --drop-bg: #e6fcf5;
+      --radius: 12px;
+      --shadow: 0 1px 2px rgba(20, 30, 50, .04), 0 8px 24px rgba(20, 30, 50, .04);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "PingFang SC", "Microsoft YaHei", -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 14px;
+      line-height: 1.5;
+      padding: 24px;
+    }
+    .page { max-width: 1120px; margin: 0 auto; }
+    .page-hd { margin-bottom: 18px; }
+    .page-title { font-size: 20px; font-weight: 600; }
+    .page-title .tag {
+      display: inline-block; margin-left: 8px; vertical-align: middle;
+      font-size: 12px; font-weight: 500; color: #0b7285;
+      background: #e3fafc; border: 1px solid #99e9f2;
+      border-radius: 999px; padding: 2px 10px;
+    }
+    .hint { color: var(--muted); font-size: 12px; margin-top: 6px; }
+
+    /* 右侧实时预览条 */
+    .layout {
+      display: grid;
+      grid-template-columns: 1fr 300px;
+      gap: 16px;
+      align-items: start;
+    }
+    @media (max-width: 960px) {
+      .layout { grid-template-columns: 1fr; }
+      .preview { position: static !important; }
+    }
+
+    .stack { display: flex; flex-direction: column; gap: 14px; }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .card-hd {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 16px 0;
+    }
+    .card-hd h3 {
+      font-size: 14px; font-weight: 600;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .step {
+      width: 22px; height: 22px; border-radius: 50%;
+      background: #edf2ff; color: var(--online);
+      font-size: 12px; font-weight: 600;
+      display: inline-flex; align-items: center; justify-content: center;
+    }
+    .card-bd { padding: 12px 16px 16px; }
+    .card-desc { font-size: 12px; color: var(--muted); margin-bottom: 12px; }
+
+    /* —— 1. 限制条件：水位熔断 —— */
+    .fuse {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    @media (max-width: 720px) { .fuse { grid-template-columns: 1fr; } }
+
+    .gauge {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 12px;
+      background: #fafbfc;
+      position: relative;
+    }
+    .gauge .g-title {
+      display: flex; justify-content: space-between; align-items: baseline;
+      margin-bottom: 10px; font-size: 13px; font-weight: 500;
+    }
+    .gauge .g-title em { font-style: normal; color: var(--muted); font-weight: 400; font-size: 12px; }
+    .gauge .g-title em b { font-style: normal; font-weight: 600; color: var(--text); }
+    .tank {
+      height: 88px;
+      border-radius: 8px;
+      border: 1px solid #d0d7e2;
+      background: linear-gradient(180deg, #f8fbff 0%, #eef4ff 100%);
+      position: relative;
+      overflow: hidden;
+      cursor: ns-resize;
+      user-select: none;
+    }
+    .tank.time {
+      background: linear-gradient(180deg, #fff9f0 0%, #fff4e6 100%);
+    }
+    .water {
+      position: absolute; left: 0; right: 0; bottom: 0;
+      background: linear-gradient(180deg, rgba(47,107,255,.35), rgba(47,107,255,.55));
+      transition: height .15s ease;
+    }
+    .tank.time .water {
+      background: linear-gradient(180deg, rgba(240,140,0,.3), rgba(240,140,0,.5));
+    }
+    .tank.dragging .water,
+    .tank.dragging .water-value,
+    .tank.dragging .threshold-line { transition: none; }
+    .water-value {
+      position: absolute; left: 8px; z-index: 3;
+      transform: translateY(50%);
+      font-size: 12px; font-weight: 600;
+      color: var(--online);
+      background: rgba(255,255,255,.92);
+      border: 1px solid #b6d0ff;
+      border-radius: 6px;
+      padding: 1px 8px;
+      pointer-events: none;
+      box-shadow: 0 1px 2px rgba(20,30,50,.06);
+      transition: bottom .15s ease, color .15s, border-color .15s;
+      white-space: nowrap;
+    }
+    .water-value small {
+      font-weight: 400; color: var(--muted); margin-left: 2px;
+    }
+    .tank.time .water-value {
+      color: var(--warn);
+      border-color: #ffd8a8;
+    }
+    .tank.paused .water-value {
+      color: var(--danger);
+      border-color: #ffc9c9;
+    }
+    .threshold-line {
+      position: absolute; left: 0; right: 0;
+      border-top: 2px dashed var(--danger);
+      z-index: 2;
+      transition: bottom .15s ease;
+    }
+    .threshold-line span {
+      position: absolute; right: 6px; top: -18px;
+      font-size: 11px; color: var(--danger); background: rgba(255,255,255,.9);
+      padding: 0 4px; border-radius: 3px;
+      white-space: nowrap;
+    }
+    .tank.paused .water {
+      background: linear-gradient(180deg, rgba(224,49,49,.35), rgba(224,49,49,.6));
+    }
+    .fuse-status {
+      margin-top: 8px;
+      font-size: 12px;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--drop);
+    }
+    .dot.off { background: var(--danger); }
+    .slider-row {
+      display: flex; align-items: center; gap: 8px; margin-top: 8px;
+    }
+    .slider-row label { font-size: 12px; color: var(--muted); white-space: nowrap; }
+    input[type="range"] { flex: 1; accent-color: var(--online); }
+    .num-box {
+      width: 64px; height: 28px; border: 1px solid #c9d0db; border-radius: 6px;
+      text-align: center; font-size: 13px; outline: none;
+    }
+    .num-box:focus { border-color: var(--online); }
+
+    /* —— 2. 出单节奏：珠串配比 —— */
+    .monitor-bar {
+      display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px;
+    }
+    .chip {
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 999px;
+      padding: 4px 12px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: .15s;
+    }
+    .chip:hover { border-color: #a8b4c8; }
+    .chip.on {
+      border-color: var(--online);
+      background: var(--safe);
+      color: var(--online);
+      font-weight: 500;
+    }
+    .chip .lock { opacity: .55; margin-left: 4px; }
+
+    .ratio-ctrl {
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+    .ratio-ctrl .eq {
+      font-size: 13px; color: var(--muted);
+    }
+    .ratio-ctrl .pair {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: #f7f8fa; border-radius: 8px; padding: 6px 10px;
+      border: 1px solid var(--line);
+    }
+    .ratio-ctrl .pair b { font-weight: 600; }
+    .ratio-ctrl input[type="number"] {
+      width: 56px; height: 30px; border: 1px solid #c9d0db; border-radius: 6px;
+      text-align: center; font-size: 14px; font-weight: 600;
+    }
+    .ratio-ctrl input:disabled {
+      background: #f0f2f5; color: var(--muted); cursor: not-allowed;
+    }
+    .constraint {
+      font-size: 12px; color: var(--warn);
+      background: #fff4e6; border: 1px solid #ffd8a8;
+      border-radius: 6px; padding: 6px 10px;
+      display: none;
+    }
+    .constraint.show { display: block; }
+
+    .beads-wrap {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 12px;
+      background: #fafbfc;
+    }
+    .beads-label {
+      display: flex; justify-content: space-between;
+      font-size: 12px; color: var(--muted); margin-bottom: 8px;
+    }
+    .legend { display: flex; gap: 12px; }
+    .legend i {
+      display: inline-block; width: 10px; height: 10px; border-radius: 50%;
+      margin-right: 4px; vertical-align: -1px;
+    }
+    .legend .onl { background: var(--online); }
+    .legend .drp { background: var(--drop); }
+
+    .beads {
+      display: flex; flex-wrap: wrap; gap: 6px; min-height: 36px;
+      align-items: center;
+    }
+    .bead {
+      width: 22px; height: 22px; border-radius: 50%;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 10px; font-weight: 600; color: #fff;
+      transform: scale(0);
+      animation: pop .28s ease forwards;
+    }
+    .bead.online { background: var(--online); }
+    .bead.drop { background: var(--drop); box-shadow: 0 0 0 3px rgba(18,184,134,.18); }
+    .bead.sep {
+      width: auto; height: auto; background: none; color: var(--muted);
+      font-size: 11px; font-weight: 400; transform: none; animation: none;
+      margin: 0 2px;
+    }
+    @keyframes pop {
+      from { transform: scale(0); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+    .cycle-text {
+      margin-top: 8px; font-size: 12px; color: var(--muted);
+    }
+    .cycle-text strong { color: var(--text); font-weight: 600; }
+
+    /* —— 3. 优先级 —— */
+    .prio-modes {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+      margin-bottom: 12px;
+    }
+    @media (max-width: 720px) { .prio-modes { grid-template-columns: 1fr; } }
+    .mode {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px 12px;
+      cursor: pointer;
+      background: #fff;
+      transition: .15s;
+      position: relative;
+    }
+    .mode:hover { border-color: #a8b4c8; }
+    .mode.on {
+      border-color: var(--online);
+      background: var(--safe);
+      box-shadow: 0 0 0 2px rgba(47,107,255,.12);
+    }
+    .mode .m-title { font-weight: 600; font-size: 13px; margin-bottom: 2px; }
+    .mode .m-desc { font-size: 11px; color: var(--muted); }
+    .mode.on::after {
+      content: "✓";
+      position: absolute; top: 8px; right: 10px;
+      color: var(--online); font-weight: 700; font-size: 12px;
+    }
+
+    .sort-list {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fafbfc;
+      padding: 8px;
+      min-height: 160px;
+    }
+    .sort-list.hidden { display: none; }
+    .sort-item {
+      display: flex; align-items: center; gap: 10px;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-bottom: 6px;
+      cursor: grab;
+      transition: box-shadow .15s, transform .15s;
+      user-select: none;
+    }
+    .sort-item:last-child { margin-bottom: 0; }
+    .sort-item:active { cursor: grabbing; }
+    .sort-item.dragging {
+      opacity: .55;
+      box-shadow: 0 8px 20px rgba(20,30,50,.12);
+      transform: scale(1.02);
+    }
+    .sort-item .handle {
+      color: #c0c6d0; letter-spacing: -2px; font-size: 14px;
+    }
+    .sort-item .rank {
+      width: 22px; height: 22px; border-radius: 6px;
+      background: #edf2ff; color: var(--online);
+      font-size: 12px; font-weight: 600;
+      display: inline-flex; align-items: center; justify-content: center;
+    }
+    .sort-item .name { flex: 1; font-weight: 500; font-size: 13px; }
+    .sort-item .tag {
+      font-size: 11px; color: var(--muted);
+      background: #f1f3f5; border-radius: 4px; padding: 1px 6px;
+    }
+    .random-panel {
+      display: none;
+      border: 1px dashed #c9d0db;
+      border-radius: 10px;
+      padding: 20px;
+      text-align: center;
+      color: var(--muted);
+      background: #fafbfc;
+    }
+    .random-panel.show { display: block; }
+    .random-panel .dice {
+      font-size: 28px; margin-bottom: 6px;
+      display: inline-block;
+      transition: transform .4s ease;
+    }
+    .random-panel.shake .dice { transform: rotate(20deg) scale(1.15); }
+
+    /* —— 4. 补齐开关 —— */
+    .fill-row {
+      display: flex; align-items: flex-start; gap: 14px;
+    }
+    .switch {
+      position: relative; width: 44px; height: 24px; flex-shrink: 0;
+      margin-top: 2px;
+    }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .switch .track {
+      position: absolute; inset: 0; border-radius: 999px;
+      background: #ced4da; cursor: pointer; transition: .2s;
+    }
+    .switch .track::after {
+      content: ""; position: absolute; width: 18px; height: 18px;
+      border-radius: 50%; background: #fff; top: 3px; left: 3px;
+      transition: .2s; box-shadow: 0 1px 3px rgba(0,0,0,.2);
+    }
+    .switch input:checked + .track { background: var(--drop); }
+    .switch input:checked + .track::after { transform: translateX(20px); }
+
+    .fill-copy { flex: 1; }
+    .fill-copy .title { font-weight: 600; font-size: 13px; margin-bottom: 2px; }
+    .fill-copy .desc { font-size: 12px; color: var(--muted); }
+
+    .fill-demo {
+      margin-top: 12px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 12px;
+      background: #fafbfc;
+    }
+    .fill-demo .slots {
+      display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px;
+    }
+    .slot {
+      width: 48px; height: 48px; border-radius: 8px;
+      border: 1.5px dashed #c9d0db;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; color: var(--muted);
+      transition: .25s;
+      background: #fff;
+    }
+    .slot.filled-online {
+      border-style: solid; border-color: var(--online);
+      background: var(--safe); color: var(--online); font-weight: 600;
+    }
+    .slot.filled-drop {
+      border-style: solid; border-color: var(--drop);
+      background: var(--drop-bg); color: var(--drop); font-weight: 600;
+      animation: pop .3s ease;
+    }
+    .slot.empty-warn {
+      border-color: #ffa8a8; background: #fff5f5; color: var(--danger);
+    }
+    .fill-note { font-size: 12px; color: var(--muted); }
+
+    /* —— 右侧预览 —— */
+    .preview {
+      position: sticky; top: 16px;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 14px;
+    }
+    .preview h3 {
+      font-size: 13px; font-weight: 600; margin-bottom: 4px;
+    }
+    .preview .sub {
+      font-size: 11px; color: var(--muted); margin-bottom: 12px;
+    }
+    .stream {
+      display: flex; flex-direction: column; gap: 6px;
+      min-height: 280px;
+    }
+    .ticket {
+      display: flex; align-items: center; gap: 8px;
+      border-radius: 8px; padding: 8px 10px;
+      font-size: 12px; font-weight: 500;
+      animation: slideIn .3s ease both;
+      border: 1px solid transparent;
+    }
+    .ticket.online {
+      background: var(--safe); color: var(--online); border-color: #d0e2ff;
+    }
+    .ticket.drop {
+      background: var(--drop-bg); color: #087f5b; border-color: #b2f2bb;
+    }
+    .ticket.blocked {
+      background: #fff5f5; color: var(--danger); border-color: #ffc9c9;
+      justify-content: center; font-weight: 400;
+    }
+    .ticket .idx {
+      width: 18px; height: 18px; border-radius: 4px;
+      background: rgba(255,255,255,.7);
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 11px;
+    }
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateX(8px); }
+      to { opacity: 1; transform: none; }
+    }
+    .preview .summary {
+      margin-top: 12px; padding-top: 10px;
+      border-top: 1px dashed var(--line);
+      font-size: 12px; color: var(--muted);
+      line-height: 1.7;
+    }
+    .preview .summary b { color: var(--text); font-weight: 600; }
+    .btn-sim {
+      width: 100%; margin-top: 10px; height: 32px;
+      border: 1px solid var(--line); border-radius: 8px;
+      background: #fff; cursor: pointer; font-size: 13px;
+    }
+    .btn-sim:hover { border-color: var(--online); color: var(--online); }
+
+    @media (prefers-reduced-motion: reduce) {
+      .bead, .ticket, .slot.filled-drop { animation: none; }
+      .water, .threshold-line { transition: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="page-hd">
+      <div class="page-title">
+        混合下发规则
+        <span class="tag">交互原型 v3 · 可拖可点</span>
+      </div>
+      <div class="hint">
+        四条规则做成可感知的控件：水位熔断、珠串配比、拖拽优先级、补齐开关；右侧实时预览取单序列。
+      </div>
+    </div>
+
+    <div class="layout">
+      <div class="stack">
+
+        <!-- 1 限制条件 -->
+        <section class="card" id="rule-limit">
+          <div class="card-hd">
+            <h3><span class="step">1</span>限制条件 · 线上水位熔断</h3>
+          </div>
+          <div class="card-bd">
+            <p class="card-desc">积单或待审过久时暂停投放下发。拖动水位线或改数字，看熔断何时触发。</p>
+            <div class="fuse">
+              <div class="gauge" data-kind="count">
+                <div class="g-title">
+                  <span>线上积单数</span>
+                  <em id="hintCount">拖水位 · 当前 <b>28</b> 条</em>
+                </div>
+                <div class="tank" id="tankCount">
+                  <div class="water" id="waterCount" style="height:35%"></div>
+                  <div class="water-value" id="valCount" style="bottom:35%">28<small>条</small></div>
+                  <div class="threshold-line" id="lineCount" style="bottom:60%">
+                    <span id="lineCountLabel">暂停线 x=40</span>
+                  </div>
+                </div>
+                <div class="slider-row">
+                  <label>阈值 x</label>
+                  <input type="range" id="rangeX" min="1" max="100" value="40" />
+                  <input class="num-box" type="number" id="inputX" min="1" max="999" value="40" />
+                  <span style="font-size:12px;color:var(--muted)">条</span>
+                </div>
+                <div class="fuse-status" id="statusCount">
+                  <span class="dot"></span>
+                  <span>投放可下发</span>
+                </div>
+              </div>
+
+              <div class="gauge" data-kind="time">
+                <div class="g-title">
+                  <span>线上待审时长</span>
+                  <em id="hintTime">拖水位 · 当前 <b>45</b> 秒</em>
+                </div>
+                <div class="tank time" id="tankTime">
+                  <div class="water" id="waterTime" style="height:25%"></div>
+                  <div class="water-value" id="valTime" style="bottom:25%">45<small>秒</small></div>
+                  <div class="threshold-line" id="lineTime" style="bottom:50%">
+                    <span id="lineTimeLabel">暂停线 t=120</span>
+                  </div>
+                </div>
+                <div class="slider-row">
+                  <label>阈值 t</label>
+                  <input type="range" id="rangeT" min="5" max="600" step="5" value="120" />
+                  <input class="num-box" type="number" id="inputT" min="1" max="9999" value="120" />
+                  <span style="font-size:12px;color:var(--muted)">秒</span>
+                </div>
+                <div class="fuse-status" id="statusTime">
+                  <span class="dot"></span>
+                  <span>投放可下发</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 2 出单节奏 -->
+        <section class="card" id="rule-rhythm">
+          <div class="card-hd">
+            <h3><span class="step">2</span>投放出单节奏 · 条数配比</h3>
+          </div>
+          <div class="card-bd">
+            <p class="card-desc">每审完 x 条线上单，插入 y 条投放单。监控类型会锁死 y 的上限或固定值。</p>
+
+            <div class="monitor-bar" id="monitorBar">
+              <button type="button" class="chip on" data-m="voice">语音 / 多模态 <span class="lock">y=1</span></button>
+              <button type="button" class="chip" data-m="picture">图片 <span class="lock">y≤8</span></button>
+              <button type="button" class="chip" data-m="text-group">文字·审核组 <span class="lock">y≤10</span></button>
+              <button type="button" class="chip" data-m="text-splice">文字拼接 / 私信拼接 <span class="lock">y=1</span></button>
+            </div>
+
+            <div class="ratio-ctrl">
+              <div class="pair">
+                <span>线上</span>
+                <input type="number" id="ratioX" min="0" value="4" />
+                <b>条</b>
+              </div>
+              <span class="eq">之后插入</span>
+              <div class="pair">
+                <span>投放</span>
+                <input type="number" id="ratioY" min="1" value="1" />
+                <b>条</b>
+              </div>
+              <div class="constraint" id="yConstraint"></div>
+            </div>
+
+            <div class="beads-wrap">
+              <div class="beads-label">
+                <span>一个周期的出单序列</span>
+                <span class="legend">
+                  <span><i class="onl"></i>线上</span>
+                  <span><i class="drp"></i>投放</span>
+                </span>
+              </div>
+              <div class="beads" id="beads"></div>
+              <div class="cycle-text" id="cycleText"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 3 优先级 -->
+        <section class="card" id="rule-prio">
+          <div class="card-hd">
+            <h3><span class="step">3</span>投放出单优先级</h3>
+          </div>
+          <div class="card-bd">
+            <p class="card-desc">选一个维度排投放池；非随机时可拖拽调整顺序。</p>
+            <div class="prio-modes" id="prioModes">
+              <div class="mode on" data-mode="type">
+                <div class="m-title">按任务类型</div>
+                <div class="m-desc">与上游权限类型对齐</div>
+              </div>
+              <div class="mode" data-mode="purpose">
+                <div class="m-title">按任务用途</div>
+                <div class="m-desc">质检 / 培训 / 考试等</div>
+              </div>
+              <div class="mode" data-mode="random">
+                <div class="m-title">随机</div>
+                <div class="m-desc">候选集内均匀抽取</div>
+              </div>
+            </div>
+
+            <div class="sort-list" id="sortType">
+              <div class="sort-item" draggable="true" data-id="qc"><span class="handle">⠿</span><span class="rank">1</span><span class="name">业务质检</span><span class="tag">类型</span></div>
+              <div class="sort-item" draggable="true" data-id="sample"><span class="handle">⠿</span><span class="rank">2</span><span class="name">智能抽检</span><span class="tag">类型</span></div>
+              <div class="sort-item" draggable="true" data-id="train"><span class="handle">⠿</span><span class="rank">3</span><span class="name">案例培训</span><span class="tag">类型</span></div>
+              <div class="sort-item" draggable="true" data-id="exam"><span class="handle">⠿</span><span class="rank">4</span><span class="name">考试任务</span><span class="tag">类型</span></div>
+            </div>
+            <div class="sort-list hidden" id="sortPurpose">
+              <div class="sort-item" draggable="true" data-id="exam2"><span class="handle">⠿</span><span class="rank">1</span><span class="name">考试</span><span class="tag">用途</span></div>
+              <div class="sort-item" draggable="true" data-id="dual"><span class="handle">⠿</span><span class="rank">2</span><span class="name">实时双审</span><span class="tag">用途</span></div>
+              <div class="sort-item" draggable="true" data-id="qc2"><span class="handle">⠿</span><span class="rank">3</span><span class="name">质检</span><span class="tag">用途</span></div>
+              <div class="sort-item" draggable="true" data-id="sample2"><span class="handle">⠿</span><span class="rank">4</span><span class="name">抽检</span><span class="tag">用途</span></div>
+              <div class="sort-item" draggable="true" data-id="train2"><span class="handle">⠿</span><span class="rank">5</span><span class="name">培训</span><span class="tag">用途</span></div>
+            </div>
+            <div class="random-panel" id="randomPanel">
+              <div class="dice">🎲</div>
+              <div>不配置固定顺序，每次从可用投放任务中随机取</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 4 补齐 -->
+        <section class="card" id="rule-fill">
+          <div class="card-hd">
+            <h3><span class="step">4</span>线上单不足时补齐投放单</h3>
+          </div>
+          <div class="card-bd">
+            <div class="fill-row">
+              <label class="switch">
+                <input type="checkbox" id="fillSwitch" checked />
+                <span class="track"></span>
+              </label>
+              <div class="fill-copy">
+                <div class="title" id="fillTitle">已开启 · 缺口用投放补齐</div>
+                <div class="desc">本批请求 5 单，线上只有 3 单时：开启则再从投放池取 2 单；关闭则只返回 3 单。</div>
+              </div>
+            </div>
+            <div class="fill-demo">
+              <div class="slots" id="fillSlots"></div>
+              <div class="fill-note" id="fillNote"></div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- 预览 -->
+      <aside class="preview">
+        <h3>取单序列预览</h3>
+        <div class="sub">按当前规则模拟接下来若干次取单</div>
+        <div class="stream" id="stream"></div>
+        <div class="summary" id="summary"></div>
+        <button type="button" class="btn-sim" id="btnSim">重新推演一轮</button>
+      </aside>
+    </div>
+  </div>
+
+  <script>
+    const state = {
+      countNow: 28,
+      countMax: 100,
+      timeNow: 45,
+      timeMax: 600,
+      x: 40,
+      t: 120,
+      monitor: "voice",
+      ratioX: 4,
+      ratioY: 1,
+      prioMode: "type",
+      fill: true,
+      onlineAvail: 3,
+      requestN: 5,
+    };
+
+    const Y_RULES = {
+      voice: { fixed: 1, tip: "语音/多模态：y 固定为 1" },
+      picture: { max: 8, tip: "图片：y 最大 8" },
+      "text-group": { max: 10, tip: "文字审核组：y 最大 10" },
+      "text-splice": { fixed: 1, tip: "文字拼接/私信拼接：y 固定为 1" },
+    };
+
+    /* —— 水位 —— */
+    function placeWaterLabel(el, pct) {
+      // 贴在水面附近；过低时抬高避免贴底裁切，过高时略下压
+      const clamped = Math.min(92, Math.max(8, pct));
+      el.style.bottom = clamped + "%";
+    }
+
+    function syncGauge() {
+      const cPct = Math.min(100, (state.countNow / state.countMax) * 100);
+      const tPct = Math.min(100, (state.timeNow / state.timeMax) * 100);
+      const xPct = Math.min(100, (state.x / state.countMax) * 100);
+      const thPct = Math.min(100, (state.t / state.timeMax) * 100);
+
+      waterCount.style.height = cPct + "%";
+      waterTime.style.height = tPct + "%";
+      placeWaterLabel(valCount, cPct);
+      placeWaterLabel(valTime, tPct);
+      valCount.innerHTML = state.countNow + "<small>条</small>";
+      valTime.innerHTML = state.timeNow + "<small>秒</small>";
+      hintCount.innerHTML = "拖水位 · 当前 <b>" + state.countNow + "</b> 条";
+      hintTime.innerHTML = "拖水位 · 当前 <b>" + state.timeNow + "</b> 秒";
+
+      lineCount.style.bottom = xPct + "%";
+      lineTime.style.bottom = thPct + "%";
+      lineCountLabel.textContent = "暂停线 x=" + state.x;
+      lineTimeLabel.textContent = "暂停线 t=" + state.t;
+
+      const countPaused = state.countNow > state.x;
+      const timePaused = state.timeNow > state.t;
+      tankCount.classList.toggle("paused", countPaused);
+      tankTime.classList.toggle("paused", timePaused);
+
+      statusCount.innerHTML = countPaused
+        ? '<span class="dot off"></span><span>积单 ' + state.countNow + ' &gt; x=' + state.x + ' · 暂停投放</span>'
+        : '<span class="dot"></span><span>积单 ' + state.countNow + ' ≤ x=' + state.x + ' · 投放可下发</span>';
+      statusTime.innerHTML = timePaused
+        ? '<span class="dot off"></span><span>待审 ' + state.timeNow + 's &gt; t=' + state.t + ' · 暂停投放</span>'
+        : '<span class="dot"></span><span>待审 ' + state.timeNow + 's ≤ t=' + state.t + ' · 投放可下发</span>';
+
+      refreshPreview();
+    }
+
+    function bindTank(tank, getNow, setNow, max) {
+      let dragging = false;
+      const update = (clientY) => {
+        const rect = tank.getBoundingClientRect();
+        const ratio = 1 - Math.min(1, Math.max(0, (clientY - rect.top) / rect.height));
+        setNow(Math.round(ratio * max));
+        syncGauge();
+      };
+      tank.addEventListener("mousedown", (e) => {
+        dragging = true;
+        tank.classList.add("dragging");
+        update(e.clientY);
+      });
+      window.addEventListener("mousemove", (e) => { if (dragging) update(e.clientY); });
+      window.addEventListener("mouseup", () => {
+        if (!dragging) return;
+        dragging = false;
+        tank.classList.remove("dragging");
+      });
+    }
+
+    bindTank(tankCount, () => state.countNow, (v) => { state.countNow = v; }, state.countMax);
+    bindTank(tankTime, () => state.timeNow, (v) => { state.timeNow = v; }, state.timeMax);
+
+    function bindNumRange(range, input, key, after) {
+      const apply = (v) => {
+        state[key] = Number(v) || 0;
+        range.value = state[key];
+        input.value = state[key];
+        after && after();
+      };
+      range.addEventListener("input", () => apply(range.value));
+      input.addEventListener("change", () => apply(input.value));
+    }
+    bindNumRange(rangeX, inputX, "x", syncGauge);
+    bindNumRange(rangeT, inputT, "t", syncGauge);
+
+    /* —— 节奏 —— */
+    function applyYRule() {
+      const rule = Y_RULES[state.monitor];
+      const yInput = ratioY;
+      const tip = yConstraint;
+      if (rule.fixed != null) {
+        state.ratioY = rule.fixed;
+        yInput.value = rule.fixed;
+        yInput.disabled = true;
+        tip.textContent = rule.tip;
+        tip.classList.add("show");
+      } else {
+        yInput.disabled = false;
+        if (state.ratioY > rule.max) state.ratioY = rule.max;
+        if (state.ratioY < 1) state.ratioY = 1;
+        yInput.value = state.ratioY;
+        tip.textContent = rule.tip + " · 当前 y=" + state.ratioY;
+        tip.classList.add("show");
+      }
+      renderBeads();
+      refreshPreview();
+    }
+
+    monitorBar.addEventListener("click", (e) => {
+      const chip = e.target.closest(".chip");
+      if (!chip) return;
+      monitorBar.querySelectorAll(".chip").forEach((c) => c.classList.remove("on"));
+      chip.classList.add("on");
+      state.monitor = chip.dataset.m;
+      applyYRule();
+    });
+
+    ratioX.addEventListener("change", () => {
+      state.ratioX = Math.max(0, Number(ratioX.value) || 0);
+      ratioX.value = state.ratioX;
+      renderBeads();
+      refreshPreview();
+    });
+    ratioY.addEventListener("change", () => {
+      const rule = Y_RULES[state.monitor];
+      let y = Math.max(1, Number(ratioY.value) || 1);
+      if (rule.max != null) y = Math.min(y, rule.max);
+      if (rule.fixed != null) y = rule.fixed;
+      state.ratioY = y;
+      ratioY.value = y;
+      renderBeads();
+      refreshPreview();
+    });
+
+    function renderBeads() {
+      const x = state.ratioX;
+      const y = state.ratioY;
+      const frag = document.createDocumentFragment();
+      let delay = 0;
+      const add = (cls, text) => {
+        const el = document.createElement("span");
+        el.className = "bead " + cls;
+        el.textContent = text;
+        el.style.animationDelay = delay + "ms";
+        delay += 18;
+        frag.appendChild(el);
+      };
+      if (x === 0) {
+        for (let i = 0; i < y; i++) add("drop", "投");
+      } else {
+        for (let i = 0; i < x; i++) add("online", "线");
+        if (y > 0) {
+          const sep = document.createElement("span");
+          sep.className = "bead sep";
+          sep.textContent = "→";
+          frag.appendChild(sep);
+          for (let i = 0; i < y; i++) add("drop", "投");
+        }
+      }
+      beads.innerHTML = "";
+      beads.appendChild(frag);
+      cycleText.innerHTML = x === 0
+        ? `当前周期：连续投放 <strong>${y}</strong> 条（x=0，仅投放节奏）`
+        : `当前周期：<strong>${x}</strong> 线上 + <strong>${y}</strong> 投放 · 投放占比约 <strong>${Math.round(y / (x + y) * 100)}%</strong>`;
+    }
+
+    /* —— 优先级拖拽 —— */
+    prioModes.addEventListener("click", (e) => {
+      const mode = e.target.closest(".mode");
+      if (!mode) return;
+      prioModes.querySelectorAll(".mode").forEach((m) => m.classList.remove("on"));
+      mode.classList.add("on");
+      state.prioMode = mode.dataset.mode;
+      sortType.classList.toggle("hidden", state.prioMode !== "type");
+      sortPurpose.classList.toggle("hidden", state.prioMode !== "purpose");
+      randomPanel.classList.toggle("show", state.prioMode === "random");
+      if (state.prioMode === "random") {
+        randomPanel.classList.add("shake");
+        setTimeout(() => randomPanel.classList.remove("shake"), 400);
+      }
+      refreshPreview();
+    });
+
+    function enableDrag(list) {
+      let dragEl = null;
+      list.querySelectorAll(".sort-item").forEach((item) => {
+        item.addEventListener("dragstart", () => {
+          dragEl = item;
+          item.classList.add("dragging");
+        });
+        item.addEventListener("dragend", () => {
+          item.classList.remove("dragging");
+          renumber(list);
+          refreshPreview();
+        });
+      });
+      list.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        const after = getDragAfter(list, e.clientY);
+        if (!dragEl) return;
+        if (after == null) list.appendChild(dragEl);
+        else list.insertBefore(dragEl, after);
+      });
+    }
+    function getDragAfter(container, y) {
+      const els = [...container.querySelectorAll(".sort-item:not(.dragging)")];
+      return els.reduce((closest, child) => {
+        const box = child.getBoundingClientRect();
+        const offset = y - box.top - box.height / 2;
+        if (offset < 0 && offset > closest.offset) return { offset, element: child };
+        return closest;
+      }, { offset: Number.NEGATIVE_INFINITY }).element;
+    }
+    function renumber(list) {
+      list.querySelectorAll(".sort-item .rank").forEach((r, i) => { r.textContent = i + 1; });
+    }
+    enableDrag(sortType);
+    enableDrag(sortPurpose);
+
+    /* —— 补齐 —— */
+    function renderFill() {
+      fillSlots.innerHTML = "";
+      const online = state.onlineAvail;
+      const need = state.requestN;
+      const on = state.fill;
+      for (let i = 0; i < need; i++) {
+        const slot = document.createElement("div");
+        slot.className = "slot";
+        if (i < online) {
+          slot.classList.add("filled-online");
+          slot.textContent = "线上";
+        } else if (on) {
+          slot.classList.add("filled-drop");
+          slot.textContent = "投放";
+        } else {
+          slot.classList.add("empty-warn");
+          slot.textContent = "空";
+        }
+        fillSlots.appendChild(slot);
+      }
+      fillTitle.textContent = on ? "已开启 · 缺口用投放补齐" : "已关闭 · 不足则少下发";
+      fillNote.textContent = on
+        ? `请求 ${need} 单，线上仅 ${online} → 补 ${need - online} 条投放，共下发 ${need} 单`
+        : `请求 ${need} 单，线上仅 ${online} → 不补齐，只下发 ${online} 单`;
+    }
+    fillSwitch.addEventListener("change", () => {
+      state.fill = fillSwitch.checked;
+      renderFill();
+      refreshPreview();
+    });
+
+    /* —— 预览流 —— */
+    function isPaused() {
+      return state.countNow > state.x || state.timeNow > state.t;
+    }
+    function topPrioName() {
+      if (state.prioMode === "random") return "随机投放";
+      const list = state.prioMode === "type" ? sortType : sortPurpose;
+      const first = list.querySelector(".sort-item .name");
+      return first ? first.textContent : "投放";
+    }
+    function refreshPreview() {
+      const stream = document.getElementById("stream");
+      stream.innerHTML = "";
+      const paused = isPaused();
+      const x = state.ratioX;
+      const y = state.ratioY;
+      const names = [];
+      let onlineN = 0, dropN = 0;
+
+      if (paused) {
+        const t = document.createElement("div");
+        t.className = "ticket blocked";
+        t.textContent = state.countNow > state.x
+          ? "熔断中：积单 > x，仅允许线上"
+          : "熔断中：待审时长 > t，仅允许线上";
+        stream.appendChild(t);
+        for (let i = 0; i < 6; i++) {
+          names.push({ type: "online", label: "线上工单" });
+          onlineN++;
+        }
+      } else {
+        // 模拟 2 个完整周期 + 补齐场景开头
+        const cycles = 2;
+        for (let c = 0; c < cycles; c++) {
+          for (let i = 0; i < x; i++) names.push({ type: "online", label: "线上工单" });
+          for (let i = 0; i < y; i++) names.push({ type: "drop", label: topPrioName() });
+        }
+        // 补齐示意：假设某次批量缺口
+        if (state.fill) {
+          names.push({ type: "online", label: "线上（批量）" });
+          names.push({ type: "online", label: "线上（批量）" });
+          names.push({ type: "online", label: "线上（批量）" });
+          names.push({ type: "drop", label: "补齐·" + topPrioName() });
+          names.push({ type: "drop", label: "补齐·" + topPrioName() });
+        }
+      }
+
+      names.slice(0, 12).forEach((n, i) => {
+        const el = document.createElement("div");
+        el.className = "ticket " + n.type;
+        el.style.animationDelay = i * 40 + "ms";
+        el.innerHTML = `<span class="idx">${i + 1}</span><span>${n.label}</span>`;
+        stream.appendChild(el);
+        if (n.type === "online") onlineN++; else dropN++;
+      });
+
+      // recount from rendered slice
+      onlineN = names.slice(0, 12).filter((n) => n.type === "online").length;
+      dropN = names.slice(0, 12).filter((n) => n.type === "drop").length;
+
+      summary.innerHTML =
+        (paused
+          ? `当前 <b>熔断</b>，投放全部冻结。<br>`
+          : `节奏 <b>${x}:${y}</b> · 优先级 <b>${state.prioMode === "random" ? "随机" : topPrioName() + "优先"}</b> · 补齐 <b>${state.fill ? "开" : "关"}</b><br>`) +
+        `预览窗内约 <b>${onlineN}</b> 线上 / <b>${dropN}</b> 投放`;
+    }
+
+    btnSim.addEventListener("click", () => {
+      // 轻微扰动水位，方便演示
+      state.countNow = Math.max(0, Math.min(state.countMax, state.countNow + Math.round((Math.random() - 0.5) * 20)));
+      state.timeNow = Math.max(0, Math.min(state.timeMax, state.timeNow + Math.round((Math.random() - 0.5) * 40)));
+      syncGauge();
+      renderBeads();
+      renderFill();
+    });
+
+    /* init */
+    applyYRule();
+    syncGauge();
+    renderFill();
+    refreshPreview();
+  </script>
+</body>
+</html>
