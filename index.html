@@ -39,6 +39,25 @@
       border-radius: 999px; padding: 2px 10px;
     }
     .hint { color: var(--muted); font-size: 12px; margin-top: 6px; }
+    .scope-bar {
+      margin-top: 12px;
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    }
+    .scope-bar .scope-label {
+      font-size: 13px; color: var(--muted); white-space: nowrap;
+    }
+    .scope-bar select {
+      height: 32px;
+      border: 1px solid #c9d0db;
+      border-radius: 6px;
+      padding: 0 10px;
+      font-size: 13px;
+      background: #fff;
+      outline: none;
+      min-width: 140px;
+      cursor: pointer;
+    }
+    .scope-bar select:focus { border-color: var(--online); }
 
     /* 右侧实时预览条 */
     .layout {
@@ -81,10 +100,25 @@
     /* —— 1. 限制条件：水位熔断 —— */
     .fuse {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: 1fr auto 1fr;
       gap: 12px;
+      align-items: center;
     }
-    @media (max-width: 720px) { .fuse { grid-template-columns: 1fr; } }
+    .fuse-or {
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--text);
+      font-size: 13px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 1px 3px rgba(20,30,50,.06);
+      flex-shrink: 0;
+    }
+    @media (max-width: 720px) {
+      .fuse { grid-template-columns: 1fr; }
+      .fuse-or { justify-self: center; }
+    }
 
     .gauge {
       border: 1px solid var(--line);
@@ -94,11 +128,17 @@
       position: relative;
     }
     .gauge .g-title {
-      display: flex; justify-content: space-between; align-items: baseline;
+      display: flex; align-items: center; gap: 8px;
       margin-bottom: 10px; font-size: 13px; font-weight: 500;
     }
-    .gauge .g-title em { font-style: normal; color: var(--muted); font-weight: 400; font-size: 12px; }
-    .gauge .g-title em b { font-style: normal; font-weight: 600; color: var(--text); }
+    .gauge .g-title label {
+      display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
+    }
+    .gauge .g-title input[type="checkbox"] {
+      width: 14px; height: 14px; accent-color: var(--online); cursor: pointer;
+    }
+    .gauge.off { opacity: .55; }
+    .gauge.off .tank { cursor: default; }
     .tank {
       height: 88px;
       border-radius: 8px;
@@ -227,13 +267,7 @@
       display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
       margin-bottom: 12px;
     }
-    .ratio-ctrl .monitor-select {
-      display: inline-flex; align-items: center; gap: 8px;
-    }
-    .ratio-ctrl .monitor-select .scope-label {
-      font-size: 12px; color: var(--muted); white-space: nowrap;
-    }
-    .ratio-ctrl .monitor-select select {
+    .ratio-ctrl select {
       height: 32px;
       border: 1px solid #c9d0db;
       border-radius: 6px;
@@ -241,10 +275,10 @@
       font-size: 13px;
       background: #fff;
       outline: none;
-      min-width: 200px;
+      min-width: 220px;
       cursor: pointer;
     }
-    .ratio-ctrl .monitor-select select:focus { border-color: var(--online); }
+    .ratio-ctrl select:focus { border-color: var(--online); }
     .ratio-ctrl .ratio-fields {
       display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
     }
@@ -253,8 +287,6 @@
     }
     .ratio-ctrl .pair {
       display: inline-flex; align-items: center; gap: 6px;
-      background: #f7f8fa; border-radius: 8px; padding: 6px 10px;
-      border: 1px solid var(--line);
     }
     .ratio-ctrl .pair b { font-weight: 600; }
     .ratio-ctrl input[type="number"] {
@@ -300,7 +332,7 @@
       padding: 8px;
       min-height: 160px;
     }
-    .sort-list.hidden { display: none; }
+    .hidden { display: none !important; }
     .sort-item {
       display: flex; align-items: center; gap: 10px;
       background: #fff;
@@ -395,7 +427,23 @@
       background: #fafbfc;
     }
     .fill-demo .slots {
-      display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px;
+      display: flex; gap: 8px; flex-wrap: wrap;
+    }
+    .fill-demo .slots.grid-layout {
+      display: grid;
+      gap: 8px;
+    }
+    .fill-demo .slots.grid-pic {
+      grid-template-columns: repeat(4, 1fr);
+      grid-template-rows: repeat(2, 1fr);
+    }
+    .fill-demo .slots.grid-text {
+      grid-template-columns: repeat(2, 1fr);
+      grid-template-rows: repeat(5, 1fr);
+    }
+    .fill-demo .slots.grid-layout .slot {
+      width: 100%;
+      height: 52px;
     }
     .slot {
       width: 48px; height: 48px; border-radius: 8px;
@@ -414,11 +462,13 @@
       background: var(--drop-bg); color: var(--drop); font-weight: 600;
       animation: pop .3s ease;
     }
+    .slot.filled-insert {
+      width: auto; min-width: 48px; padding: 0 6px;
+      font-size: 10px; line-height: 1.2; text-align: center;
+    }
     .slot.empty-warn {
       border-color: #ffa8a8; background: #fff5f5; color: var(--danger);
     }
-    .fill-note { font-size: 12px; color: var(--muted); }
-
     /* —— 右侧预览 —— */
     .preview {
       position: sticky; top: 16px;
@@ -447,6 +497,9 @@
     }
     .ticket.online {
       background: var(--safe); color: var(--online); border-color: #d0e2ff;
+    }
+    .ticket.online.fuse {
+      background: #fff5f5; color: var(--danger); border-color: #ffc9c9;
     }
     .ticket.drop {
       background: var(--drop-bg); color: #087f5b; border-color: #b2f2bb;
@@ -529,6 +582,13 @@
   <div class="page">
     <div class="page-hd">
       <div class="page-title">出单规则配置</div>
+      <div class="scope-bar">
+        <select id="monitorSelect">
+          <option value="voice" selected>音频</option>
+          <option value="picture">图片</option>
+          <option value="text">文字</option>
+        </select>
+      </div>
     </div>
 
     <div class="layout">
@@ -541,10 +601,12 @@
           </div>
           <div class="card-bd">
             <div class="fuse">
-              <div class="gauge" data-kind="count">
+              <div class="gauge" data-kind="count" id="gaugeCount">
                 <div class="g-title">
-                  <span>线上积单数</span>
-                  <em id="hintCount">当前 <b>28</b> 条</em>
+                  <label>
+                    <input type="checkbox" id="enableCount" />
+                    <span>线上积单数</span>
+                  </label>
                 </div>
                 <div class="tank" id="tankCount">
                   <div class="water" id="waterCount" style="height:35%"></div>
@@ -565,10 +627,14 @@
                 </div>
               </div>
 
-              <div class="gauge" data-kind="time">
+              <div class="fuse-or" title="满足任一条件即触发">或</div>
+
+              <div class="gauge" data-kind="time" id="gaugeTime">
                 <div class="g-title">
-                  <span>线上待审时长</span>
-                  <em id="hintTime">当前 <b>45</b> 秒</em>
+                  <label>
+                    <input type="checkbox" id="enableTime" />
+                    <span>线上单待审时长+工单数量</span>
+                  </label>
                 </div>
                 <div class="tank time" id="tankTime">
                   <div class="water" id="waterTime" style="height:25%"></div>
@@ -582,6 +648,9 @@
                   <input type="range" class="range-time" id="rangeT" min="5" max="600" step="5" value="120" />
                   <input class="num-box" type="number" id="inputT" min="1" max="9999" value="120" />
                   <span style="font-size:12px;color:var(--muted)">秒</span>
+                  <label>工单数量 y</label>
+                  <input class="num-box" type="number" id="inputTicketY" min="1" max="999" value="20" />
+                  <span style="font-size:12px;color:var(--muted)">条</span>
                 </div>
                 <div class="fuse-status" id="statusTime">
                   <span class="dot"></span>
@@ -599,14 +668,10 @@
           </div>
           <div class="card-bd">
             <div class="ratio-ctrl">
-              <div class="monitor-select">
-                <select id="monitorSelect">
-                  <option value="voice" selected>音频（y=1）</option>
-                  <option value="picture">图片（y≤8）</option>
-                  <option value="text-group">文字·审核组（y≤10）</option>
-                  <option value="text-splice">文字拼接 / 私信拼接（y=1）</option>
-                </select>
-              </div>
+              <select id="textMonitorSelect" class="hidden">
+                <option value="text-group" selected>文字审核组</option>
+                <option value="text-splice">文字拼接/私信拼接</option>
+              </select>
               <div class="ratio-fields">
                 <span class="eq">每提交</span>
                 <div class="pair">
@@ -651,6 +716,9 @@
               <div class="sort-item" draggable="true" data-id="text-sample"><label class="check"><input type="checkbox" /></label><span class="handle">⠿</span><span class="rank">6</span><span class="name">文字抽检</span><span class="tag">类型</span></div>
               <div class="sort-item" draggable="true" data-id="special"><label class="check"><input type="checkbox" /></label><span class="handle">⠿</span><span class="rank">7</span><span class="name">特殊工单</span><span class="tag">类型</span></div>
               <div class="sort-item" draggable="true" data-id="redeploy"><label class="check"><input type="checkbox" /></label><span class="handle">⠿</span><span class="rank">8</span><span class="name">二次投放</span><span class="tag">类型</span></div>
+              <div class="sort-item" draggable="true" data-id="case-train"><label class="check"><input type="checkbox" /></label><span class="handle">⠿</span><span class="rank">9</span><span class="name">案例培训</span><span class="tag">类型</span></div>
+              <div class="sort-item" draggable="true" data-id="composite-sample"><label class="check"><input type="checkbox" /></label><span class="handle">⠿</span><span class="rank">10</span><span class="name">综合抽检</span><span class="tag">类型</span></div>
+              <div class="sort-item" draggable="true" data-id="market-random"><label class="check"><input type="checkbox" /></label><span class="handle">⠿</span><span class="rank">11</span><span class="name">大盘随机抽检</span><span class="tag">类型</span></div>
             </div>
             <div class="sort-list hidden" id="sortPurpose">
               <div class="sort-item" draggable="true" data-id="normal-qc"><label class="check"><input type="checkbox" /></label><span class="handle">⠿</span><span class="rank">1</span><span class="name">常规质检</span><span class="tag">用途</span></div>
@@ -670,22 +738,21 @@
         <!-- 4 补齐 -->
         <section class="card" id="rule-fill">
           <div class="card-hd">
-            <h3><span class="step">4</span>线上单不足时补齐投放单</h3>
+            <h3><span class="step">4</span>线上单不足时是否补投放单</h3>
           </div>
           <div class="card-bd">
             <div class="fill-row">
               <label class="switch">
-                <input type="checkbox" id="fillSwitch" checked />
+                <input type="checkbox" id="fillSwitch" />
                 <span class="track"></span>
               </label>
               <div class="fill-copy">
-                <div class="title" id="fillTitle">已开启 · 缺口用投放补齐</div>
-                <div class="desc">如请求 8 单，线上只有 3 单时，开启该配置项则再从投放池取 5 单。</div>
+                <div class="title" id="fillTitle">已关闭</div>
+                <div class="desc" id="fillDesc">如请求 8 单，线上+插入的投放单=3单时，不补齐，只下发3单。</div>
               </div>
             </div>
             <div class="fill-demo">
               <div class="slots" id="fillSlots"></div>
-              <div class="fill-note" id="fillNote"></div>
             </div>
           </div>
         </section>
@@ -710,12 +777,16 @@
       timeMax: 600,
       x: 40,
       t: 120,
+      y: 20,
+      enableCount: false,
+      enableTime: false,
       monitor: "voice",
       ratioX: 4,
       ratioY: 1,
       prioMode: "type",
-      fill: true,
-      onlineAvail: 3,
+      fill: false,
+      onlineAvail: 2,
+      insertedDrop: 1,
       requestN: 8,
     };
 
@@ -745,25 +816,33 @@
       placeWaterLabel(valTime, tPct);
       valCount.innerHTML = state.countNow + "<small>条</small>";
       valTime.innerHTML = state.timeNow + "<small>秒</small>";
-      hintCount.innerHTML = "当前 <b>" + state.countNow + "</b> 条";
-      hintTime.innerHTML = "当前 <b>" + state.timeNow + "</b> 秒";
 
       lineCount.style.bottom = xPct + "%";
       lineTime.style.bottom = thPct + "%";
       lineCountLabel.textContent = "暂停线 x=" + state.x;
       lineTimeLabel.textContent = "暂停线 t=" + state.t;
 
-      const countPaused = state.countNow > state.x;
-      const timePaused = state.timeNow > state.t;
+      const countHit = state.countNow > state.x;
+      const timeOver = state.timeNow > state.t;
+      const ticketOver = state.countNow > state.y;
+      const timeHit = timeOver && ticketOver;
+      const countPaused = state.enableCount && countHit;
+      const timePaused = state.enableTime && timeHit;
+      gaugeCount.classList.toggle("off", !state.enableCount);
+      gaugeTime.classList.toggle("off", !state.enableTime);
       tankCount.classList.toggle("paused", countPaused);
       tankTime.classList.toggle("paused", timePaused);
 
-      statusCount.innerHTML = countPaused
-        ? '<span class="dot off"></span><span>积单 ' + state.countNow + ' &gt; x=' + state.x + ' · 暂停投放</span>'
-        : '<span class="dot"></span><span>积单 ' + state.countNow + ' ≤ x=' + state.x + ' · 投放可下发</span>';
-      statusTime.innerHTML = timePaused
-        ? '<span class="dot off"></span><span>待审 ' + state.timeNow + 's &gt; t=' + state.t + ' · 暂停投放</span>'
-        : '<span class="dot"></span><span>待审 ' + state.timeNow + 's ≤ t=' + state.t + ' · 投放可下发</span>';
+      statusCount.innerHTML = !state.enableCount
+        ? '<span class="dot off"></span><span>未启用</span>'
+        : countPaused
+          ? '<span class="dot off"></span><span>积单 &gt; x=' + state.x + ' · 暂停投放</span>'
+          : '<span class="dot"></span><span>积单 ≤ x=' + state.x + ' · 投放可下发</span>';
+      statusTime.innerHTML = !state.enableTime
+        ? '<span class="dot off"></span><span>未启用</span>'
+        : timePaused
+          ? '<span class="dot off"></span><span>待审&gt;' + state.t + '+工单数量&gt;' + state.y + ' · 暂停投放</span>'
+          : '<span class="dot"></span><span>待审≤' + state.t + '+工单数量≥' + state.y + ' · 投放可下发</span>';
 
       refreshPreview();
     }
@@ -814,6 +893,20 @@
     }
     bindNumRange(rangeX, inputX, "x", syncGauge);
     bindNumRange(rangeT, inputT, "t", syncGauge);
+    inputTicketY.addEventListener("change", () => {
+      state.y = Math.max(1, Number(inputTicketY.value) || 1);
+      inputTicketY.value = state.y;
+      syncGauge();
+    });
+
+    enableCount.addEventListener("change", () => {
+      state.enableCount = enableCount.checked;
+      syncGauge();
+    });
+    enableTime.addEventListener("change", () => {
+      state.enableTime = enableTime.checked;
+      syncGauge();
+    });
 
     /* —— 节奏 —— */
     function applyYRule() {
@@ -832,10 +925,16 @@
       refreshPreview();
     }
 
-    monitorSelect.addEventListener("change", () => {
-      state.monitor = monitorSelect.value;
+    function syncMonitorSelect() {
+      const outer = monitorSelect.value;
+      const isText = outer === "text";
+      textMonitorSelect.classList.toggle("hidden", !isText);
+      state.monitor = isText ? textMonitorSelect.value : outer;
       applyYRule();
-    });
+      renderFill();
+    }
+    monitorSelect.addEventListener("change", syncMonitorSelect);
+    textMonitorSelect.addEventListener("change", syncMonitorSelect);
 
     ratioX.addEventListener("change", () => {
       state.ratioX = Math.max(0, Number(ratioX.value) || 0);
@@ -916,18 +1015,41 @@
     enableDrag(sortPurpose);
 
     /* —— 补齐 —— */
+    function shuffleInPlace(arr) {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        const tmp = arr[i]; arr[i] = arr[j]; arr[j] = tmp;
+      }
+      return arr;
+    }
+
     function renderFill() {
       fillSlots.innerHTML = "";
+      const isPic = state.monitor === "picture";
+      const isTextGroup = state.monitor === "text-group";
+      const useGrid = isPic || isTextGroup;
+      fillSlots.classList.toggle("grid-layout", useGrid);
+      fillSlots.classList.toggle("grid-pic", isPic);
+      fillSlots.classList.toggle("grid-text", isTextGroup);
       const online = state.onlineAvail;
-      const need = state.requestN;
+      const inserted = state.insertedDrop;
+      const need = isPic ? 8 : isTextGroup ? 10 : state.requestN;
       const on = state.fill;
-      for (let i = 0; i < need; i++) {
+      const kinds = [];
+      for (let i = 0; i < online; i++) kinds.push("online");
+      for (let i = 0; i < inserted; i++) kinds.push("insert");
+      while (kinds.length < need) kinds.push(on ? "drop" : "empty");
+      if (useGrid) shuffleInPlace(kinds);
+      kinds.forEach((kind) => {
         const slot = document.createElement("div");
         slot.className = "slot";
-        if (i < online) {
+        if (kind === "online") {
           slot.classList.add("filled-online");
           slot.textContent = "线上";
-        } else if (on) {
+        } else if (kind === "insert") {
+          slot.classList.add("filled-drop", "filled-insert");
+          slot.textContent = "插入的投放";
+        } else if (kind === "drop") {
           slot.classList.add("filled-drop");
           slot.textContent = "投放";
         } else {
@@ -935,11 +1057,17 @@
           slot.textContent = "空";
         }
         fillSlots.appendChild(slot);
+      });
+      fillTitle.textContent = on ? "已开启" : "已关闭";
+      if (isTextGroup) {
+        fillDesc.textContent = on
+          ? "如请求 10 单，线上+插入的投放单=3单时，再从投放池取7单凑满10单"
+          : "如请求 10 单，线上+插入的投放单=3单时，不补齐，只下发3单。";
+      } else {
+        fillDesc.textContent = on
+          ? "如请求 8 单，线上+插入的投放单=3单时，再从投放池取5单凑满8单"
+          : "如请求 8 单，线上+插入的投放单=3单时，不补齐，只下发3单。";
       }
-      fillTitle.textContent = on ? "已开启 · 缺口用投放补齐" : "已关闭 · 不足则少下发";
-      fillNote.textContent = on
-        ? `请求 ${need} 单，线上 ${online} 单 → 再从投放池取 ${need - online} 单`
-        : `请求 ${need} 单，线上 ${online} 单 → 关闭后不补齐，只下发 ${online} 单`;
     }
     fillSwitch.addEventListener("change", () => {
       state.fill = fillSwitch.checked;
@@ -949,7 +1077,9 @@
 
     /* —— 预览流 —— */
     function isPaused() {
-      return state.countNow > state.x || state.timeNow > state.t;
+      const countPaused = state.enableCount && state.countNow > state.x;
+      const timePaused = state.enableTime && state.timeNow > state.t && state.countNow > state.y;
+      return countPaused || timePaused;
     }
     function topPrioName() {
       if (state.prioMode === "random") return "随机投放";
@@ -994,9 +1124,9 @@
       if (paused) {
         const t = document.createElement("div");
         t.className = "ticket blocked";
-        t.textContent = state.countNow > state.x
+        t.textContent = (state.enableCount && state.countNow > state.x)
           ? "熔断中：积单 > x，仅允许线上"
-          : "熔断中：待审时长 > t，仅允许线上";
+          : "熔断中：待审时长 > t 且 工单数 > y，仅允许线上";
         stream.appendChild(t);
       }
 
@@ -1027,7 +1157,7 @@
       summary.innerHTML =
         (paused ? `当前 <b>熔断</b>，投放全部冻结。<br>` : "") +
         `${layout.name}节奏：每提交 <b>${x}</b> 次审核后，插入 <b>${y}</b> 条投放<br>` +
-        `每块横${layout.cols}竖${layout.rows}共 <b>${layout.total}</b> 张；前 <b>${x}</b> 块全线上，下一块随机混入 <b>${insertY}</b> 张投放<br>` +
+        `前 <b>${x}</b> 块全线上，下一块随机混入 <b>${insertY}</b> 张投放<br>` +
         `预览合计 <b>${onlineCells}</b> 张线上 / <b>${dropCells}</b> 张投放`;
     }
 
@@ -1048,11 +1178,11 @@
       if (paused) {
         const t = document.createElement("div");
         t.className = "ticket blocked";
-        t.textContent = state.countNow > state.x
+        t.textContent = (state.enableCount && state.countNow > state.x)
           ? "熔断中：积单 > x，仅允许线上"
-          : "熔断中：待审时长 > t，仅允许线上";
+          : "熔断中：待审时长 > t 且 工单数 > y，仅允许线上";
         stream.appendChild(t);
-        for (let i = 0; i < 6; i++) names.push({ type: "online", label: "线上工单" });
+        for (let i = 0; i < 6; i++) names.push({ type: "online fuse", label: "线上工单" });
       } else {
         const cycles = 2;
         for (let c = 0; c < cycles; c++) {
@@ -1074,7 +1204,7 @@
         stream.appendChild(el);
       });
 
-      const onlineN = names.slice(0, showN).filter((n) => n.type === "online").length;
+      const onlineN = names.slice(0, showN).filter((n) => n.type.indexOf("online") === 0).length;
       const dropN = names.slice(0, showN).filter((n) => n.type === "drop").length;
 
       summary.innerHTML =
