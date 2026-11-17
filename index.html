@@ -675,12 +675,20 @@
               <div class="ratio-fields">
                 <span class="eq">每提交</span>
                 <div class="pair">
-                  <input type="number" id="ratioX" min="0" value="4" />
+                  <input type="number" id="ratioXMin" min="0" value="3" />
+                  <b>~</b>
+                  <input type="number" id="ratioXMax" min="0" value="4" />
                   <b>次</b>
                 </div>
                 <span class="eq">审核后，插入</span>
-                <div class="pair">
-                  <input type="number" id="ratioY" min="1" value="1" />
+                <div class="pair" id="ratioYSingleWrap">
+                  <input type="number" id="ratioYSingle" min="1" value="1" />
+                  <b>条</b>
+                </div>
+                <div class="pair hidden" id="ratioYRangeWrap">
+                  <input type="number" id="ratioYMin" min="1" value="1" />
+                  <b>~</b>
+                  <input type="number" id="ratioYMax" min="1" value="4" />
                   <b>条</b>
                 </div>
                 <span class="eq">投放单</span>
@@ -781,8 +789,10 @@
       enableCount: false,
       enableTime: false,
       monitor: "voice",
-      ratioX: 4,
-      ratioY: 1,
+      ratioXMin: 3,
+      ratioXMax: 4,
+      ratioYMin: 1,
+      ratioYMax: 4,
       prioMode: "type",
       fill: false,
       onlineAvail: 2,
@@ -909,18 +919,69 @@
     });
 
     /* —— 节奏 —— */
-    function applyYRule() {
+    function clampYRange() {
       const rule = Y_RULES[state.monitor];
-      const yInput = ratioY;
       if (rule.fixed != null) {
-        state.ratioY = rule.fixed;
-        yInput.value = rule.fixed;
-        yInput.disabled = true;
+        return { min: rule.fixed, max: rule.fixed, fixed: true };
+      }
+      let min = Math.max(1, Number(state.ratioYMin) || 1);
+      let max = Math.max(1, Number(state.ratioYMax) || 1);
+      if (rule.max != null) {
+        min = Math.min(min, rule.max);
+        max = Math.min(max, rule.max);
+      }
+      if (min > max) {
+        const tmp = min; min = max; max = tmp;
+      }
+      state.ratioYMin = min;
+      state.ratioYMax = max;
+      return { min, max, fixed: false };
+    }
+
+    function clampXRange() {
+      let min = Math.max(0, Number(state.ratioXMin) || 0);
+      let max = Math.max(0, Number(state.ratioXMax) || 0);
+      if (min > max) {
+        const tmp = min; min = max; max = tmp;
+      }
+      state.ratioXMin = min;
+      state.ratioXMax = max;
+      return { min, max };
+    }
+
+    function sampleX() {
+      const { min, max } = clampXRange();
+      return min + Math.floor(Math.random() * (max - min + 1));
+    }
+
+    function xRangeLabel() {
+      const { min, max } = clampXRange();
+      return min === max ? String(min) : (min + "~" + max);
+    }
+
+    function sampleY() {
+      const { min, max } = clampYRange();
+      return min + Math.floor(Math.random() * (max - min + 1));
+    }
+
+    function yRangeLabel() {
+      const { min, max } = clampYRange();
+      return min === max ? String(min) : (min + "~" + max);
+    }
+
+    function applyYRule() {
+      const { min, max, fixed } = clampYRange();
+      const useSingle = fixed || state.monitor === "voice" || state.monitor === "text-splice";
+      ratioYSingleWrap.classList.toggle("hidden", !useSingle);
+      ratioYRangeWrap.classList.toggle("hidden", useSingle);
+      if (useSingle) {
+        ratioYSingle.value = min;
+        ratioYSingle.disabled = fixed;
       } else {
-        yInput.disabled = false;
-        if (state.ratioY > rule.max) state.ratioY = rule.max;
-        if (state.ratioY < 1) state.ratioY = 1;
-        yInput.value = state.ratioY;
+        ratioYMin.value = min;
+        ratioYMax.value = max;
+        ratioYMin.disabled = false;
+        ratioYMax.disabled = false;
       }
       refreshPreview();
     }
@@ -936,19 +997,32 @@
     monitorSelect.addEventListener("change", syncMonitorSelect);
     textMonitorSelect.addEventListener("change", syncMonitorSelect);
 
-    ratioX.addEventListener("change", () => {
-      state.ratioX = Math.max(0, Number(ratioX.value) || 0);
-      ratioX.value = state.ratioX;
+    function onXRangeChange() {
+      state.ratioXMin = Math.max(0, Number(ratioXMin.value) || 0);
+      state.ratioXMax = Math.max(0, Number(ratioXMax.value) || 0);
+      const { min, max } = clampXRange();
+      ratioXMin.value = min;
+      ratioXMax.value = max;
       refreshPreview();
-    });
-    ratioY.addEventListener("change", () => {
+    }
+    ratioXMin.addEventListener("change", onXRangeChange);
+    ratioXMax.addEventListener("change", onXRangeChange);
+
+    function onYRangeChange() {
+      state.ratioYMin = Math.max(1, Number(ratioYMin.value) || 1);
+      state.ratioYMax = Math.max(1, Number(ratioYMax.value) || 1);
+      applyYRule();
+    }
+    ratioYMin.addEventListener("change", onYRangeChange);
+    ratioYMax.addEventListener("change", onYRangeChange);
+    ratioYSingle.addEventListener("change", () => {
       const rule = Y_RULES[state.monitor];
-      let y = Math.max(1, Number(ratioY.value) || 1);
-      if (rule.max != null) y = Math.min(y, rule.max);
+      let y = Math.max(1, Number(ratioYSingle.value) || 1);
       if (rule.fixed != null) y = rule.fixed;
-      state.ratioY = y;
-      ratioY.value = y;
-      refreshPreview();
+      else if (rule.max != null) y = Math.min(y, rule.max);
+      state.ratioYMin = y;
+      state.ratioYMax = y;
+      applyYRule();
     });
 
     /* —— 优先级拖拽 —— */
@@ -1039,7 +1113,8 @@
       for (let i = 0; i < online; i++) kinds.push("online");
       for (let i = 0; i < inserted; i++) kinds.push("insert");
       while (kinds.length < need) kinds.push(on ? "drop" : "empty");
-      if (useGrid) shuffleInPlace(kinds);
+      // 关闭时：线上+插入的投放固定排最前；开启时：网格模式随机排布
+      if (useGrid && on) shuffleInPlace(kinds);
       kinds.forEach((kind) => {
         const slot = document.createElement("div");
         slot.className = "slot";
@@ -1120,7 +1195,7 @@
       return `<div class="pic-grid${colClass}" title="横${layout.cols}×竖${layout.rows} · 共${total}张">${cells}</div>`;
     }
 
-    function renderGridPreview(stream, paused, x, y, layout) {
+    function renderGridPreview(stream, paused, layout) {
       if (paused) {
         const t = document.createElement("div");
         t.className = "ticket blocked";
@@ -1130,11 +1205,16 @@
         stream.appendChild(t);
       }
 
-      // 每次审核 = 一块；前 x 次全线上；下一块混入 y 张投放；序号连续 1、2、3…
-      const insertY = Math.max(0, Math.min(layout.total, y));
+      // 每次审核 = 一块；前 x 次全线上；下一块混入区间内随机 y 张投放
       const blocks = [];
+      const sampledXs = [];
+      const sampledYs = [];
       const cycles = 2;
       for (let c = 0; c < cycles; c++) {
+        const x = sampleX();
+        const insertY = Math.max(0, Math.min(layout.total, sampleY()));
+        sampledXs.push(x);
+        sampledYs.push(insertY);
         if (x === 0) {
           blocks.push({ dropCount: insertY || layout.total });
         } else {
@@ -1154,10 +1234,12 @@
         onlineCells += layout.total - b.dropCount;
       });
 
+      const xLabel = xRangeLabel();
+      const yLabel = yRangeLabel();
       summary.innerHTML =
         (paused ? `当前 <b>熔断</b>，投放全部冻结。<br>` : "") +
-        `${layout.name}节奏：每提交 <b>${x}</b> 次审核后，插入 <b>${y}</b> 条投放<br>` +
-        `前 <b>${x}</b> 块全线上，下一块随机混入 <b>${insertY}</b> 张投放<br>` +
+        `${layout.name}节奏：每提交 <b>${xLabel}</b> 次审核后，插入 <b>${yLabel}</b> 条投放<br>` +
+        `本轮抽样 x=<b>${sampledXs.join("/")}</b>，投放=<b>${sampledYs.join("/")}</b><br>` +
         `预览合计 <b>${onlineCells}</b> 张线上 / <b>${dropCells}</b> 张投放`;
     }
 
@@ -1165,16 +1247,17 @@
       const stream = document.getElementById("stream");
       stream.innerHTML = "";
       const paused = isPaused();
-      const x = state.ratioX;
-      const y = state.ratioY;
+      const xLabel = xRangeLabel();
+      const yLabel = yRangeLabel();
       const gridLayout = GRID_LAYOUTS[state.monitor];
 
       if (gridLayout) {
-        renderGridPreview(stream, paused, x, y, gridLayout);
+        renderGridPreview(stream, paused, gridLayout);
         return;
       }
 
       const names = [];
+      const sampledPairs = [];
       if (paused) {
         const t = document.createElement("div");
         t.className = "ticket blocked";
@@ -1186,6 +1269,9 @@
       } else {
         const cycles = 2;
         for (let c = 0; c < cycles; c++) {
+          const x = sampleX();
+          const y = sampleY();
+          sampledPairs.push(x + ":" + y);
           for (let i = 0; i < x; i++) names.push({ type: "online", label: "线上工单" });
           for (let i = 0; i < y; i++) names.push({ type: "drop", label: topPrioName() });
         }
@@ -1210,7 +1296,7 @@
       summary.innerHTML =
         (paused
           ? `当前 <b>熔断</b>，投放全部冻结。<br>`
-          : `节奏 <b>${x}:${y}</b> · 优先级 <b>${state.prioMode === "random" ? "随机" : topPrioName() + "优先"}</b> · 补齐 <b>${state.fill ? "开" : "关"}</b><br>`) +
+          : `节奏 <b>${xLabel}:${yLabel}</b>${sampledPairs.length ? "（本轮 " + sampledPairs.join(" / ") + "）" : ""} · 优先级 <b>${state.prioMode === "random" ? "随机" : topPrioName() + "优先"}</b> · 补齐 <b>${state.fill ? "开" : "关"}</b><br>`) +
         `预览窗内约 <b>${onlineN}</b> 线上 / <b>${dropN}</b> 投放`;
     }
 
